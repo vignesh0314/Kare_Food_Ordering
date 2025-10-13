@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>KARE Food Ordering - Modern Campus Dining</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body>
+    <header>
+        <div class="header-container">
+            <div class="logo">
+                <img src="{{ url_for('static', filename='images/college_logo.png') }}" alt="KARE Logo" class="logo-image">
+                <h1>KARE</h1>
+                <p>Food Ordering System</p>
+            </div>
+            <div class="nav-links">
+                
+                <a href="{{ url_for('home') }}" class="nav-link">Home</a>
+                <a href="{{ url_for('order_status') }}" class="nav-link">Order Status</a>
+                <a href="{{ url_for('admin_login') }}" class="nav-link">Admin</a>
+            </div>
+            
+        </div>
+    </header>
+
+    <!-- Modern Hero Section -->
+    <section class="hero-modern">
+        <div class="hero-content">
+            <h1>Campus Dining Made Easy</h1>
+            <p>Order delicious food from your favorite campus restaurants with just a few clicks. Fast delivery, great prices, and amazing taste!</p>
+            <div class="hero-stats">
+                <div class="stat-item">
+                    <span class="stat-number">{{ restaurants|length }}+</span>
+                    <span class="stat-label">Restaurants</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-number">24/7</span>
+                    <span class="stat-label">Service</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-number">15min</span>
+                    <span class="stat-label">Avg. Delivery</span>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Features Section -->
+    <section class="features-section">
+        <div class="section-header">
+            <h2>Why Choose Us</h2>
+            <p>Experience the best campus food ordering system with these amazing features</p>
+        </div>
+        <div class="features-grid">
+            <div class="feature-card">
+                <div class="feature-icon">
+                    <i class="fas fa-bolt"></i>
+                </div>
+                <h3>Fast Delivery</h3>
+                <p>Get your food delivered to your location within 15-20 minutes</p>
+            </div>
+            <div class="feature-card">
+                <div class="feature-icon">
+                    <i class="fas fa-utensils"></i>
+                </div>
+                <h3>Fresh Food</h3>
+                <p>All meals prepared fresh daily with high-quality ingredients</p>
+            </div>
+            <div class="feature-card">
+                <div class="feature-icon">
+                    <i class="fas fa-money-bill-wave"></i>
+                </div>
+                <h3>Best Prices</h3>
+                <p>Student-friendly prices with great value for money</p>
+            </div>
+            <div class="feature-card">
+                <div class="feature-icon">
+                    <i class="fas fa-mobile-alt"></i>
+                </div>
+                <h3>Easy Ordering</h3>
+                <p>Simple and intuitive ordering process from any device</p>
+            </div>
+        </div>
+    </section>
+
+    <!-- Restaurants Section -->
+    <section class="restaurants-modern" id="restaurants">
+        <div class="section-header">
+            <h2>Our Restaurants</h2>
+            <p>Discover amazing food from our campus partners</p>
+        </div>
+        <div class="restaurant-grid-modern">
+            {% for id, restaurant in restaurants.items() %}
+            <div class="restaurant-card-modern">
+                <div class="restaurant-image-modern">
+                    <img src="{{ url_for('static', filename='images/' + restaurant.image) }}" alt="{{ restaurant.name }}">
+                    <div class="restaurant-badge">Popular</div>
+                </div>
+                <div class="restaurant-content">
+                    <div class="restaurant-header-modern">
+                        {% if restaurant.logo %}
+                        <img src="{{ url_for('static', filename='images/logos/' + restaurant.logo) }}" 
+                             alt="{{ restaurant.name }} Logo" 
+                             class="restaurant-logo-modern">
+                        {% else %}
+                        <div class="restaurant-logo-modern" style="background: linear-gradient(45deg, #667eea, #764ba2); display: flex; align-items: center; justify-content: center; color: white; font-weight: bold; font-size: 1.2rem;">
+                            {{ restaurant.name[0] }}
+                        </div>
+                        {% endif %}
+                        <div class="restaurant-info-modern">
+                            <h3>{{ restaurant.name }}</h3>
+                            <div class="restaurant-rating">
+                                <div class="stars">
+                                    <i class="fas fa-star"></i>
+                                    <i class="fas fa-star"></i>
+                                    <i class="fas fa-star"></i>
+                                    <i class="fas fa-star"></i>
+                                    <i class="fas fa-star-half-alt"></i>
+                                </div>
+                                <span class="rating-text">{{ restaurant.rating }} (250+)</span>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="restaurant-features">
+                        {% for category in restaurant.menu.keys() %}
+                        <span class="feature-tag">{{ category|title }}</span>
+                        {% endfor %}
+                    </div>
+                    
+                    <p class="restaurant-description">{{ restaurant.description }}</p>
+                    
+                    <div class="restaurant-footer">
+                        <div class="delivery-info">
+                            <i class="fas fa-clock"></i>
+                            <span class="delivery-time">{{ restaurant.delivery_time }}</span>
+                        </div>
+                        <a href="{{ url_for('menu', restaurant_id=id) }}" class="btn-modern">
+                            <i class="fas fa-utensils"></i> Order Now
+                        </a>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </section>
+
+    <!-- CTA Section -->
+    <section class="cta-section">
+        <div class="cta-content">
+            <h2>Ready to Order?</h2>
+            <p>Join thousands of students who enjoy convenient campus dining every day</p>
+            <div class="cta-buttons">
+                <a href="#restaurants" class="btn-modern">
+                    <i class="fas fa-utensils"></i> Browse Restaurants
+                </a>
+                <a href="{{ url_for('order_status') }}" class="btn-outline">
+                    <i class="fas fa-search"></i> Check Order Status
+                </a>
+            </div>
+        </div>
+    </section>
+
+    <footer>
+        <div class="container">
+            <p>&copy; 2023 Kalasalingam Academy of Research and Education. All rights reserved.</p>
+        </div>
+    </footer>
+
+    <script>
+        // Smooth scroll for CTA button
+        document.querySelector('a[href="#restaurants"]').addEventListener('click', function(e) {
+            e.preventDefault();
+            document.querySelector('.restaurants-modern').scrollIntoView({
+                behavior: 'smooth'
+            });
+        });
+    </script>
+</body>
+</html>

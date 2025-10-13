@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ restaurant.name }} - KARE Food Ordering</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body>
+    <header>
+        <div class="header-container">
+            <div class="logo">
+                <img src="{{ url_for('static', filename='images/college_logo.png') }}" alt="KARE Logo" class="logo-image">
+                <h1>KARE</h1>
+                <p>Food Ordering System</p>
+            </div>
+            <div class="nav-links">
+                <a href="{{ url_for('home') }}" class="nav-link">Home</a>
+                <a href="{{ url_for('order_status') }}" class="nav-link">Order Status</a>
+                <a href="{{ url_for('admin_login') }}" class="nav-link">Admin</a>
+            </div>
+            <a href="{{ url_for('home') }}" class="back-btn"><i class="fas fa-arrow-left"></i> Back to Restaurants</a>
+        </div>
+    </header>
+
+    <section class="menu">
+        <div class="menu-container">
+            <div class="restaurant-header">
+                {% if restaurant.logo %}
+                <img src="{{ url_for('static', filename='images/logos/' + restaurant.logo) }}" 
+                     alt="{{ restaurant.name }} Logo" 
+                     class="restaurant-logo">
+                {% else %}
+                <div class="restaurant-logo" style="background: linear-gradient(45deg, #667eea, #764ba2); display: flex; align-items: center; justify-content: center; color: white; font-weight: bold; font-size: 1.5rem;">
+                    {{ restaurant.name[0] }}
+                </div>
+                {% endif %}
+                <div class="restaurant-header-info">
+                    <h2>{{ restaurant.name }}</h2>
+                    <p>{{ restaurant.description }}</p>
+                </div>
+            </div>
+
+            <form action="{{ url_for('order', restaurant_id=restaurant_id) }}" method="POST" class="modern-form" id="orderForm">
+                <!-- User Information -->
+                <div class="user-info-grid">
+                    <div class="form-group-modern">
+                        <label for="name"><i class="fas fa-user"></i> Full Name</label>
+                        <input type="text" id="name" name="name" placeholder="Enter your full name" required>
+                    </div>
+                    <div class="form-group-modern">
+                        <label for="student_id"><i class="fas fa-id-card"></i> Student ID</label>
+                        <input type="text" id="student_id" name="student_id" placeholder="Enter your student ID" required>
+                    </div>
+                    <div class="form-group-modern">
+                        <label for="phone"><i class="fas fa-phone"></i> Phone Number</label>
+                        <input type="tel" id="phone" name="phone" placeholder="Enter your phone number" required>
+                    </div>
+                </div>
+
+                <!-- Category Tabs -->
+                <div class="menu-categories">
+                    {% for category in restaurant.menu.keys() %}
+                    <div class="category-tab {% if loop.first %}active{% endif %}" 
+                         onclick="showCategory('{{ category }}')">
+                        {{ category|title }}
+                    </div>
+                    {% endfor %}
+                </div>
+
+                <!-- Menu Items by Category -->
+                {% for category, items in restaurant.menu.items() %}
+                <div id="category-{{ category }}" class="category-section {% if loop.first %}active{% endif %}">
+                    <div class="menu-items-grid">
+                        {% for item, price in items.items() %}
+                        <div class="menu-item-card">
+                            <div class="menu-item-header">
+                                <h3 class="menu-item-name">{{ item }}</h3>
+                                <div class="menu-item-price">₹{{ price }}</div>
+                            </div>
+                            <p class="menu-item-description">Freshly prepared {{ item|lower }} made with quality ingredients</p>
+                            <div class="quantity-selector">
+                                <span class="quantity-label">Quantity:</span>
+                                <input type="number" 
+                                       id="{{ category }}_{{ item }}" 
+                                       name="{{ category }}_{{ item }}" 
+                                       class="quantity-input-modern"
+                                       min="0" 
+                                       max="10" 
+                                       value="0"
+                                       onchange="updateCartTotal()">
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+                {% endfor %}
+
+                <button type="submit" class="order-btn-modern">
+                    <i class="fas fa-paper-plane"></i> Place Your Order
+                </button>
+            </form>
+        </div>
+
+        <!-- Floating Cart -->
+        <div class="floating-cart" id="floatingCart" style="display: none;">
+            <div class="cart-total">Total: ₹<span id="cartTotal">0</span></div>
+            <button type="submit" form="orderForm" class="cart-button">
+                <i class="fas fa-shopping-bag"></i> Order Now
+            </button>
+        </div>
+    </section>
+
+    <footer>
+        <div class="container">
+            <p>&copy; 2023 Kalasalingam Academy of Research and Education. All rights reserved.</p>
+        </div>
+    </footer>
+
+    <script>
+        // Category switching
+        function showCategory(category) {
+            // Hide all category sections
+            document.querySelectorAll('.category-section').forEach(section => {
+                section.classList.remove('active');
+            });
+            
+            // Show selected category
+            document.getElementById('category-' + category).classList.add('active');
+            
+            // Update active tab
+            document.querySelectorAll('.category-tab').forEach(tab => {
+                tab.classList.remove('active');
+            });
+            event.target.classList.add('active');
+        }
+
+        // Calculate cart total
+        function updateCartTotal() {
+            let total = 0;
+            let hasItems = false;
+            
+            // Get all quantity inputs
+            const quantityInputs = document.querySelectorAll('input[type="number"]');
+            quantityInputs.forEach(input => {
+                const quantity = parseInt(input.value) || 0;
+                if (quantity > 0) {
+                    hasItems = true;
+                    // Extract price from the price display
+                    const priceElement = input.closest('.menu-item-card').querySelector('.menu-item-price');
+                    const priceText = priceElement.textContent;
+                    const price = parseInt(priceText.replace('₹', '')) || 0;
+                    total += price * quantity;
+                }
+            });
+            
+            document.getElementById('cartTotal').textContent = total;
+            
+            // Show/hide floating cart
+            const floatingCart = document.getElementById('floatingCart');
+            if (hasItems) {
+                floatingCart.style.display = 'flex';
+            } else {
+                floatingCart.style.display = 'none';
+            }
+        }
+
+        // Initialize cart total
+        document.addEventListener('DOMContentLoaded', function() {
+            updateCartTotal();
+        });
+    </script>
+</body>
+</html>

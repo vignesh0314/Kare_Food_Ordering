@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Order Status - KARE Food Ordering</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body>
+    <header>
+        <div class="header-container">
+            <div class="logo">
+                <img src="{{ url_for('static', filename='images/college_logo.png') }}" alt="KARE Logo" class="logo-image">
+                <h1>KARE</h1>
+                <p>Food Ordering System</p>
+            </div>
+            <div class="nav-links">
+                <a href="{{ url_for('home') }}" class="nav-link">Home</a>
+                <a href="{{ url_for('order_status') }}" class="nav-link">Order Status</a>
+                <a href="{{ url_for('admin_login') }}" class="nav-link">Admin</a>
+            </div>
+            <a href="{{ url_for('home') }}" class="back-btn"><i class="fas fa-arrow-left"></i> Back to Home</a>
+        </div>
+    </header>
+
+    <section class="order-status">
+        <div class="container">
+            <h2>Check Your Order Status</h2>
+            
+            {% if orders %}
+            <div class="status-results">
+                <h3>Orders for {{ student_id }} ({{ phone }})</h3>
+                
+                {% for order in orders %}
+                <div class="order-card">
+                    <div class="order-header">
+                        <span class="order-id">Order #{{ order.id }}</span>
+                        <span class="order-time">{{ order.order_time }}</span>
+                        <span class="status-badge status-{{ order.status|lower }}">{{ order.status }}</span>
+                    </div>
+                    
+                    <div class="order-details">
+                        <div class="detail-row">
+                            <span class="label">Restaurant:</span>
+                            <span class="value">{{ order.restaurant }}</span>
+                        </div>
+                        <div class="detail-row">
+                            <span class="label">Customer:</span>
+                            <span class="value">{{ order.name }}</span>
+                        </div>
+                        
+                        <h4>Order Items</h4>
+                        <div class="order-items">
+                            {% if order.order_items %}
+                                {% for item_name, item_details in order.order_items.items() %}
+                                <div class="order-item">
+                                    <span class="item-name">{{ item_name }} (x{{ item_details.quantity }})</span>
+                                    <span class="item-price">₹{{ item_details.subtotal }}</span>
+                                </div>
+                                {% endfor %}
+                            {% else %}
+                                <p class="no-items">No items found in this order</p>
+                            {% endif %}
+                        </div>
+                        
+                        <div class="order-total">
+                            <span class="label">Total Amount:</span>
+                            <span class="value">₹{{ order.total }}</span>
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+            
+            {% else %}
+            <form action="{{ url_for('api_order_status') }}" method="POST" class="status-form">
+                <div class="form-group">
+                    <label for="student_id">Student ID:</label>
+                    <input type="text" id="student_id" name="student_id" required 
+                           value="{{ student_id if student_id else '' }}">
+                </div>
+                
+                <div class="form-group">
+                    <label for="phone">Phone Number:</label>
+                    <input type="tel" id="phone" name="phone" required 
+                           value="{{ phone if phone else '' }}">
+                </div>
+                
+                <button type="submit" class="btn">Check Status</button>
+                
+                {% if student_id %}
+                <div class="no-orders-message">
+                    <i class="fas fa-search"></i>
+                    <h3>No orders found</h3>
+                    <p>No orders found for Student ID: <strong>{{ student_id }}</strong> with phone: <strong>{{ phone }}</strong></p>
+                    <p>Please check your details and try again.</p>
+                </div>
+                {% endif %}
+            </form>
+            {% endif %}
+        </div>
+    </section>
+
+    <footer>
+        <div class="container">
+            <p>&copy; 2023 Kalasalingam Academy of Research and Education. All rights reserved.</p>
+        </div>
+    </footer>
+</body>
+</html>

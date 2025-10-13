@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Order Confirmation - KARE Food Ordering</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body>
+    <header>
+        <div class="header-container">
+            <div class="logo">
+                <img src="{{ url_for('static', filename='images/college_logo.png') }}" alt="KARE Logo" class="logo-image">
+                <h1>KARE</h1>
+                <p>Food Ordering System</p>
+            </div>
+            <div class="nav-links">
+                <a href="{{ url_for('home') }}" class="nav-link">Home</a>
+                <a href="{{ url_for('order_status') }}" class="nav-link">Order Status</a>
+                <a href="{{ url_for('admin_login') }}" class="nav-link">Admin</a>
+            </div>
+            <a href="{{ url_for('home') }}" class="back-btn"><i class="fas fa-arrow-left"></i> Back to Home</a>
+        </div>
+    </header>
+
+    <section class="order-confirmation">
+        <div class="container">
+            <div class="confirmation-card">
+                <div class="confirmation-header">
+                    <i class="fas fa-check-circle"></i>
+                    <h2>Order Confirmed!</h2>
+                    <p>Thank you for your order</p>
+                </div>
+                
+                <div class="order-details">
+                    <div class="order-restaurant-info">
+                        {% if order.restaurant_logo %}
+                        <img src="{{ url_for('static', filename='images/logos/' + order.restaurant_logo) }}" 
+                            alt="{{ order.restaurant }} Logo" 
+                            class="order-restaurant-logo">
+                        {% else %}
+                        <div class="order-restaurant-logo" style="background: linear-gradient(45deg, #667eea, #764ba2); display: flex; align-items: center; justify-content: center; color: white; font-weight: bold;">
+                            {{ order.restaurant[0] }}
+                        </div>
+                        {% endif %}
+                        <div>
+                            <h3>{{ order.restaurant }}</h3>
+                            <p>Order #{{ order.id }}</p>
+                        </div>
+                    </div>
+
+                    <h3>Order Details</h3>
+                    <div class="detail-row">
+                        <span class="label">Name:</span>
+                        <span class="value">{{ order.name }}</span>
+                    </div>
+                    <div class="detail-row">
+                        <span class="label">Student ID:</span>
+                        <span class="value">{{ order.student_id }}</span>
+                    </div>
+                    <div class="detail-row">
+                        <span class="label">Phone:</span>
+                        <span class="value">{{ order.phone }}</span>
+                    </div>
+                    <div class="detail-row">
+                        <span class="label">Order Time:</span>
+                        <span class="value">{{ order.order_time }}</span>
+                    </div>
+                    <div class="detail-row">
+                        <span class="label">Status:</span>
+                        <span class="value status-badge status-{{ order.status|lower }}">{{ order.status }}</span>
+                    </div>
+                    
+                    <h3>Order Items</h3>
+                    <div class="order-items">
+                        {% if order.order_items %}
+                            {% for item_name, item_details in order.order_items.items() %}
+                            <div class="order-item">
+                                <span class="item-name">{{ item_name }} (x{{ item_details.quantity }})</span>
+                                <span class="item-price">₹{{ item_details.subtotal }}</span>
+                            </div>
+                            {% endfor %}
+                        {% else %}
+                            <p class="no-items">No items in order</p>
+                        {% endif %}
+                    </div>
+                    
+                    <div class="order-total">
+                        <span class="label">Total Amount:</span>
+                        <span class="value">₹{{ order.total }}</span>
+                    </div>
+                </div>
+                
+                <div class="confirmation-footer">
+                    <p><i class="fas fa-clock"></i> Your food will be ready in 20-30 minutes. You will receive a confirmation SMS.</p>
+                    <p><i class="fas fa-info-circle"></i> You can track your order status using your Student ID and Phone number.</p>
+                    <a href="{{ url_for('home') }}" class="btn-modern">
+                        <i class="fas fa-utensils"></i> Place Another Order
+                    </a>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <footer>
+        <div class="container">
+            <p>&copy; 2023 Kalasalingam Academy of Research and Education. All rights reserved.</p>
+        </div>
+    </footer>
+</body>
+</html>
