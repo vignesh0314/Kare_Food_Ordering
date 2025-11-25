@@ -9,149 +9,256 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 </head>
 <body>
-    <header>
-        <div class="header-container">
-            <div class="logo">
-                <img src="{{ url_for('static', filename='images/college_logo.png') }}" alt="KARE Logo" class="logo-image">
-                <h1>KARE</h1>
-                <p>Food Ordering System - Admin Panel</p>
-            </div>
-            <div class="nav-links">
-                <a href="{{ url_for('home') }}" class="nav-link">Home</a>
-                <a href="{{ url_for('order_status') }}" class="nav-link">Order Status</a>
-                <a href="{{ url_for('admin_login') }}" class="nav-link">Admin</a>
-            </div>
-            <div class="header-actions">
-                <a href="{{ url_for('home') }}" class="back-btn"><i class="fas fa-home"></i> Site Home</a>
-                <a href="{{ url_for('admin_login') }}" class="back-btn"><i class="fas fa-sign-out-alt"></i> Logout</a>
-            </div>
-        </div>
-    </header>
 
-    <section class="admin-dashboard">
-        <div class="container">
-            <div class="dashboard-header">
-                <h2>Order Management</h2>
-                <div class="stats">
-                    <div class="stat-card">
-                        <h3>Total Orders</h3>
-                        <span class="stat-number">{{ orders|length }}</span>
-                    </div>
-                    <div class="stat-card">
-                        <h3>Pending</h3>
-                        <span class="stat-number">
-                            {{ orders|selectattr('status', 'equalto', 'Received')|list|length + 
-                               orders|selectattr('status', 'equalto', 'Preparing')|list|length }}
-                        </span>
-                    </div>
-                    <div class="stat-card">
-                        <h3>Completed</h3>
-                        <span class="stat-number">
-                            {{ orders|selectattr('status', 'equalto', 'Completed')|list|length }}
-                        </span>
-                    </div>
+<header>
+    <div class="header-container">
+        <div class="logo">
+            <img src="{{ url_for('static', filename='images/college_logo.png') }}" alt="KARE Logo" class="logo-image">
+            <h1>KARE</h1>
+            <p>Food Ordering System - Admin Panel</p>
+        </div>
+
+        <div class="nav-links">
+            <a href="{{ url_for('home') }}" class="nav-link">Home</a>
+            <a href="{{ url_for('order_status') }}" class="nav-link">Order Status</a>
+            <a href="{{ url_for('admin_login') }}" class="nav-link">Admin</a>
+        </div>
+
+        <div class="header-actions">
+            <a href="{{ url_for('home') }}" class="back-btn"><i class="fas fa-home"></i> Site Home</a>
+            <a href="{{ url_for('admin_login') }}" class="back-btn"><i class="fas fa-sign-out-alt"></i> Logout</a>
+        </div>
+    </div>
+</header>
+
+
+<section class="admin-dashboard">
+    <div class="container">
+
+        <!-- =======================================
+             DELIVERY LOCATIONS - MOVED TO THE TOP
+        =========================================-->
+        <div class="dashboard-header">
+            <h2>Delivery Locations</h2>
+        </div>
+
+        <!-- Add Location Form -->
+        <div class="modern-form" style="padding:1.5rem;">
+            <form action="{{ url_for('admin_add_location') }}" method="POST" class="locations-add-form">
+                <div class="field">
+                    <label>Location Name</label>
+                    <input type="text" name="name" placeholder="e.g. North Gate" required>
                 </div>
-            </div>
-            
-            {% if orders %}
-            <div class="admin-orders-container">
-                <div class="orders-table-container">
-                    <table class="orders-table">
-                        <thead>
-                            <tr>
-                                <th>Order ID</th>
-                                <th>Customer</th>
-                                <th>Student ID</th>
-                                <th>Restaurant</th>
-                                <th>Items</th>
-                                <th>Total</th>
-                                <th>Order Time</th>
-                                <th>Status</th>
-                                <th>Actions</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {% for order in orders %}
-                            <tr>
-                                <td class="order-id-cell">#{{ order.id }}</td>
-                                <td>{{ order.name }}</td>
-                                <td>{{ order.student_id }}</td>
-                                <td class="admin-restaurant-cell">
-                                    {% if order.restaurant_logo %}
-                                    <img src="{{ url_for('static', filename='images/logos/' + order.restaurant_logo) }}" 
-                                         alt="{{ order.restaurant }} Logo" 
-                                         class="admin-order-logo">
-                                    {% else %}
-                                    <div class="admin-order-logo" style="background: linear-gradient(45deg, #667eea, #764ba2); display: flex; align-items: center; justify-content: center; color: white; font-weight: bold; font-size: 0.8rem;">
-                                        {{ order.restaurant[0] }}
-                                    </div>
-                                    {% endif %}
-                                    {{ order.restaurant }}
-                                </td>
-                                <td class="items-cell">
-                                    <div class="order-items-preview">
-                                        {% if order.order_items %}
-                                            {% for item_name, item_details in order.order_items.items() %}
-                                            <span class="item-tag">{{ item_name }} (x{{ item_details.quantity }})</span>
-                                            {% endfor %}
-                                        {% else %}
-                                            <span class="no-items">No items</span>
-                                        {% endif %}
-                                    </div>
-                                </td>
-                                <td class="price-cell">₹{{ order.total }}</td>
-                                <td class="time-cell">{{ order.order_time }}</td>
-                                <td class="status-cell">
-                                    <span class="status-badge status-{{ order.status|lower }}">{{ order.status }}</span>
-                                </td>
-                                <td class="actions-cell">
-                                    <div class="action-buttons">
-                                        <form action="{{ url_for('update_order_status') }}" method="POST" class="status-form">
-                                            <input type="hidden" name="order_id" value="{{ order.id }}">
-                                            <select name="status" class="status-select" onchange="this.form.submit()">
-                                                <option value="Received" {% if order.status == 'Received' %}selected{% endif %}>Received</option>
-                                                <option value="Preparing" {% if order.status == 'Preparing' %}selected{% endif %}>Preparing</option>
-                                                <option value="Ready" {% if order.status == 'Ready' %}selected{% endif %}>Ready</option>
-                                                <option value="Completed" {% if order.status == 'Completed' %}selected{% endif %}>Completed</option>
-                                            </select>
-                                        </form>
-                                        
-                                        <form action="{{ url_for('delete_order') }}" method="POST" class="delete-form">
-                                            <input type="hidden" name="order_id" value="{{ order.id }}">
-                                            <button type="submit" class="btn-delete" title="Delete Order" onclick="return confirm('Are you sure you want to delete order #{{ order.id }}?')">
-                                                <i class="fas fa-trash"></i>
-                                            </button>
-                                        </form>
-                                    </div>
-                                </td>
-                            </tr>
-                            {% endfor %}
-                        </tbody>
-                    </table>
+
+                <div class="field">
+                    <label>Short Code (optional)</label>
+                    <input type="text" name="short_code" placeholder="e.g. NG">
                 </div>
-            </div>
+
+                <div>
+                    <label style="opacity:0;">a</label>
+                    <button class="btn-modern" type="submit">Add Location</button>
+                </div>
+            </form>
+        </div>
+
+        <!-- Locations Table -->
+        <div class="locations-card">
+            {% if locations %}
+            <table class="locations-table">
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>Location Name</th>
+                        <th>Short Code</th>
+                        <th>Active</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+
+                <tbody>
+                {% for loc in locations %}
+                <tr>
+                    <td>#{{ loc.id }}</td>
+                    <td>{{ loc.name }}</td>
+                    <td>{{ loc.short_code or '-' }}</td>
+
+                    <td>
+                        {% if loc.is_active %}
+                        <span class="loc-badge-active">Active</span>
+                        {% else %}
+                        <span class="loc-badge-inactive">Inactive</span>
+                        {% endif %}
+                    </td>
+
+                    <td>
+                        <div class="locations-actions">
+                            <!-- Toggle -->
+                            <form action="{{ url_for('admin_toggle_location', location_id=loc.id) }}" method="POST">
+                                <button class="btn" type="submit">
+                                    {% if loc.is_active %}Deactivate{% else %}Activate{% endif %}
+                                </button>
+                            </form>
+
+                            <!-- Delete -->
+                            <form action="{{ url_for('admin_delete_location', location_id=loc.id) }}" method="POST">
+                                <button class="btn-delete" onclick="return confirm('Delete {{ loc.name }}?')" type="submit">
+                                    <i class="fas fa-trash"></i>
+                                </button>
+                            </form>
+                        </div>
+                    </td>
+                </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+
             {% else %}
-            <div class="no-orders">
-                <i class="fas fa-clipboard-list"></i>
-                <h3>No orders yet</h3>
-                <p>When customers place orders, they will appear here.</p>
-                <a href="{{ url_for('home') }}" class="btn">Go to Home Page</a>
-            </div>
+            <p style="padding:1rem; color:#777;">No delivery locations added yet.</p>
             {% endif %}
         </div>
-    </section>
 
-    <footer>
-        <div class="container">
-            <p>&copy; 2023 Kalasalingam Academy of Research and Education. All rights reserved.</p>
+
+        <!-- =======================================
+               ORDER MANAGEMENT - NOW BELOW
+        =========================================-->
+        <div class="dashboard-header" style="margin-top:3rem;">
+            <h2>Order Management</h2>
+
+            <div class="stats">
+                <div class="stat-card">
+                    <h3>Total Orders</h3>
+                    <span class="stat-number">{{ orders|length }}</span>
+                </div>
+
+                <div class="stat-card">
+                    <h3>Pending</h3>
+                    <span class="stat-number">
+                        {{ orders|selectattr('status', 'equalto', 'Received')|list|length +
+                           orders|selectattr('status', 'equalto', 'Preparing')|list|length }}
+                    </span>
+                </div>
+
+                <div class="stat-card">
+                    <h3>Completed</h3>
+                    <span class="stat-number">
+                        {{ orders|selectattr('status', 'equalto', 'Completed')|list|length }}
+                    </span>
+                </div>
+            </div>
         </div>
-    </footer>
 
-    <script>
-        // Auto-refresh the page every 30 seconds to see new orders
-        setTimeout(function() {
-            window.location.reload();
-        }, 30000);
-    </script>
+
+        {% if orders %}
+        <div class="admin-orders-container">
+            <div class="orders-table-container">
+
+                <table class="orders-table">
+                    <thead>
+                        <tr>
+                            <th>Order ID</th>
+                            <th>Customer</th>
+                            <th>Student ID</th>
+                            <th>Restaurant</th>
+                            <th>Items</th>
+                            <th>Total</th>
+                            <th>Order Time</th>
+                            <th>Status</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+
+                    <tbody>
+                    {% for order in orders %}
+                    <tr>
+                        <td class="order-id-cell">#{{ order.id }}</td>
+                        <td>{{ order.name }}</td>
+                        <td>{{ order.student_id }}</td>
+
+                        <td class="admin-restaurant-cell">
+                            {% if order.restaurant_logo %}
+                            <img src="{{ url_for('static', filename='images/logos/' + order.restaurant_logo) }}"
+                                 class="admin-order-logo">
+                            {% else %}
+                            <div class="admin-order-logo"
+                                 style="background: linear-gradient(45deg,#667eea,#764ba2); color:white;">
+                                {{ order.restaurant[0] }}
+                            </div>
+                            {% endif %}
+                            {{ order.restaurant }}
+                        </td>
+
+                        <td class="items-cell">
+                            {% if order.order_items %}
+                            <div class="order-items-preview">
+                                {% for item_name, item_details in order.order_items.items() %}
+                                <span class="item-tag">{{ item_name }} (x{{ item_details.quantity }})</span>
+                                {% endfor %}
+                            </div>
+                            {% else %}
+                            <span class="no-items">No items</span>
+                            {% endif %}
+                        </td>
+
+                        <td class="price-cell">₹{{ order.total }}</td>
+                        <td class="time-cell">{{ order.order_time }}</td>
+
+                        <td class="status-cell">
+                            <span class="status-badge status-{{ order.status|lower }}">{{ order.status }}</span>
+                        </td>
+
+                        <td class="actions-cell">
+                            <div class="action-buttons">
+
+                                <form action="{{ url_for('update_order_status') }}" method="POST">
+                                    <input type="hidden" name="order_id" value="{{ order.id }}">
+                                    <select class="status-select" name="status" onchange="this.form.submit()">
+                                        <option value="Received" {% if order.status == 'Received' %}selected{% endif %}>Received</option>
+                                        <option value="Preparing" {% if order.status == 'Preparing' %}selected{% endif %}>Preparing</option>
+                                        <option value="Ready" {% if order.status == 'Ready' %}selected{% endif %}>Ready</option>
+                                        <option value="Completed" {% if order.status == 'Completed' %}selected{% endif %}>Completed</option>
+                                    </select>
+                                </form>
+
+                                <form action="{{ url_for('delete_order') }}" method="POST">
+                                    <input type="hidden" name="order_id" value="{{ order.id }}">
+                                    <button class="btn-delete" onclick="return confirm('Delete order #{{ order.id }}?')">
+                                        <i class="fas fa-trash"></i>
+                                    </button>
+                                </form>
+
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                    </tbody>
+
+                </table>
+
+            </div>
+        </div>
+
+        {% else %}
+        <div class="no-orders">
+            <i class="fas fa-clipboard-list"></i>
+            <h3>No orders yet</h3>
+            <p>Orders will appear here once customers place them.</p>
+        </div>
+        {% endif %}
+
+    </div>
+</section>
+
+
+<footer>
+    <div class="container">
+        <p>&copy; 2023 Kalasalingam Academy of Research and Education. All rights reserved.</p>
+    </div>
+</footer>
+
+<script>
+    setTimeout(() => { window.location.reload(); }, 30000);
+</script>
+
 </body>
 </html>
