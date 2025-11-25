@@ -58,13 +58,31 @@
                         <label for="phone"><i class="fas fa-phone"></i> Phone Number</label>
                         <input type="tel" id="phone" name="phone" placeholder="Enter your phone number" required>
                     </div>
+
+                    <!-- Delivery Location (populated by backend: pass `locations`) -->
+                    <div class="form-group-modern">
+                        <label for="location_id"><i class="fas fa-map-marker-alt"></i> Delivery Location</label>
+                        <select id="location_id" name="location_id" required>
+                            <option value="" disabled selected>Select delivery location</option>
+                            {% if locations %}
+                                {% for loc in locations %}
+                                    <!-- loc should be dict-like with .id and .name -->
+                                    <option value="{{ loc.id }}">{{ loc.name }}</option>
+                                {% endfor %}
+                            {% else %}
+                                <!-- If backend didn't pass any locations or none active -->
+                                <option value="" disabled>No delivery locations available</option>
+                            {% endif %}
+                        </select>
+                        <small class="helper-text">Only admin-approved locations will appear here.</small>
+                    </div>
                 </div>
 
                 <!-- Category Tabs -->
                 <div class="menu-categories">
                     {% for category in restaurant.menu.keys() %}
                     <div class="category-tab {% if loop.first %}active{% endif %}" 
-                         onclick="showCategory('{{ category }}')">
+                         onclick="showCategory('{{ category }}', event)">
                         {{ category|title }}
                     </div>
                     {% endfor %}
@@ -121,20 +139,25 @@
 
     <script>
         // Category switching
-        function showCategory(category) {
+        function showCategory(category, evt) {
             // Hide all category sections
             document.querySelectorAll('.category-section').forEach(section => {
                 section.classList.remove('active');
             });
             
             // Show selected category
-            document.getElementById('category-' + category).classList.add('active');
+            const el = document.getElementById('category-' + category);
+            if (el) el.classList.add('active');
             
             // Update active tab
             document.querySelectorAll('.category-tab').forEach(tab => {
                 tab.classList.remove('active');
             });
-            event.target.classList.add('active');
+            if (evt && evt.currentTarget) {
+                evt.currentTarget.classList.add('active');
+            } else if (event && event.target) {
+                event.target.classList.add('active');
+            }
         }
 
         // Calculate cart total
@@ -143,15 +166,15 @@
             let hasItems = false;
             
             // Get all quantity inputs
-            const quantityInputs = document.querySelectorAll('input[type="number"]');
+            const quantityInputs = document.querySelectorAll('input[type="number"].quantity-input-modern');
             quantityInputs.forEach(input => {
                 const quantity = parseInt(input.value) || 0;
                 if (quantity > 0) {
                     hasItems = true;
                     // Extract price from the price display
                     const priceElement = input.closest('.menu-item-card').querySelector('.menu-item-price');
-                    const priceText = priceElement.textContent;
-                    const price = parseInt(priceText.replace('₹', '')) || 0;
+                    const priceText = priceElement ? priceElement.textContent : '';
+                    const price = parseInt(priceText.replace('₹', '').trim()) || 0;
                     total += price * quantity;
                 }
             });
@@ -166,6 +189,35 @@
                 floatingCart.style.display = 'none';
             }
         }
+
+        // Form submit validation: ensure at least one item and a location selected
+        document.getElementById('orderForm').addEventListener('submit', function(e) {
+            // ensure at least one item > 0
+            const quantityInputs = document.querySelectorAll('input[type="number"].quantity-input-modern');
+            let totalQty = 0;
+            quantityInputs.forEach(input => {
+                totalQty += parseInt(input.value) || 0;
+            });
+
+            const locationSelect = document.getElementById('location_id');
+            const locationValue = locationSelect ? locationSelect.value : '';
+
+            if (!locationValue) {
+                e.preventDefault();
+                alert('Please select a delivery location (admin-approved).');
+                locationSelect.focus();
+                return false;
+            }
+
+            if (totalQty <= 0) {
+                e.preventDefault();
+                alert('Please select at least one item to order.');
+                return false;
+            }
+
+            // ok to submit — you still must validate server-side on the backend
+            return true;
+        });
 
         // Initialize cart total
         document.addEventListener('DOMContentLoaded', function() {

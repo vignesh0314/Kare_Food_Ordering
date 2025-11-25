@@ -6,15 +6,17 @@ from datetime import datetime
 
 app = Flask(__name__)
 
+DB_PATH = 'data/food_orders.db'
+
 # Initialize database
 def init_db():
     if not os.path.exists('data'):
         os.makedirs('data')
-    
-    conn = sqlite3.connect('data/food_orders.db')
+
+    conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
-    
-    # Create tables
+
+    # Create orders table (include location_id if this is a fresh DB)
     c.execute('''CREATE TABLE IF NOT EXISTS orders
                  (id INTEGER PRIMARY KEY AUTOINCREMENT,
                   restaurant TEXT NOT NULL,
@@ -24,12 +26,32 @@ def init_db():
                   items TEXT NOT NULL,
                   total REAL NOT NULL,
                   status TEXT DEFAULT 'Received',
-                  order_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP)''')
-    
+                  order_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                  location_id INTEGER DEFAULT NULL)''')  # location_id added here
+
+    # Create locations table (admin-managed)
+    c.execute('''CREATE TABLE IF NOT EXISTS locations
+                 (id INTEGER PRIMARY KEY AUTOINCREMENT,
+                  name TEXT NOT NULL,
+                  short_code TEXT,
+                  is_active INTEGER NOT NULL DEFAULT 1,
+                  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)''')
+
+    # In case older DB exists without location_id column, add it
+    # (SQLite allows ALTER TABLE .. ADD COLUMN)
+    c.execute("PRAGMA table_info(orders)")
+    cols = [row[1] for row in c.fetchall()]  # second field is column name
+    if 'location_id' not in cols:
+        try:
+            c.execute('ALTER TABLE orders ADD COLUMN location_id INTEGER DEFAULT NULL')
+        except Exception:
+            # In rare edge cases (very old SQLite) ignore — main flow still works
+            pass
+
     conn.commit()
     conn.close()
 
-# Restaurant data with logos
+# Restaurant data with logos (unchanged)
 restaurants = {
     "main_canteen": {
         "name": "Nalambagam Canteen",
@@ -165,9 +187,19 @@ def home():
 @app.route('/menu/<restaurant_id>')
 def menu(restaurant_id):
     if restaurant_id in restaurants:
-        return render_template('menu.html', 
-                             restaurant=restaurants[restaurant_id],
-                             restaurant_id=restaurant_id)
+        # Fetch active locations from DB and pass to template
+        conn = sqlite3.connect(DB_PATH)
+        c = conn.cursor()
+        c.execute("SELECT id, name, short_code, is_active FROM locations WHERE is_active = 1 ORDER BY name")
+        loc_rows = c.fetchall()
+        conn.close()
+
+        locations = [{'id': r[0], 'name': r[1], 'short_code': r[2], 'is_active': r[3]} for r in loc_rows]
+
+        return render_template('menu.html',
+                               restaurant=restaurants[restaurant_id],
+                               restaurant_id=restaurant_id,
+                               locations=locations)
     return redirect(url_for('home'))
 
 @app.route('/order/<restaurant_id>', methods=['POST'])
@@ -177,9 +209,42 @@ def order(restaurant_id):
         name = request.form.get('name')
         student_id = request.form.get('student_id')
         phone = request.form.get('phone')
+        location_id = request.form.get('location_id')  # new field from menu.html
         items = {}
         total = 0
-        
+
+        # Validate location_id server-side
+        if not location_id:
+            # missing location
+            return render_template('menu.html',
+                                   restaurant=restaurants[restaurant_id],
+                                   restaurant_id=restaurant_id,
+                                   locations=get_active_locations(),
+                                   error="Please select a delivery location (admin-approved).")
+
+        try:
+            location_id_int = int(location_id)
+        except:
+            return render_template('menu.html',
+                                   restaurant=restaurants[restaurant_id],
+                                   restaurant_id=restaurant_id,
+                                   locations=get_active_locations(),
+                                   error="Invalid delivery location selected.")
+
+        # Check location exists and is active
+        conn = sqlite3.connect(DB_PATH)
+        c = conn.cursor()
+        c.execute("SELECT id, name, is_active FROM locations WHERE id = ?", (location_id_int,))
+        loc_row = c.fetchone()
+        if not loc_row or loc_row[2] != 1:
+            conn.close()
+            return render_template('menu.html',
+                                   restaurant=restaurants[restaurant_id],
+                                   restaurant_id=restaurant_id,
+                                   locations=get_active_locations(),
+                                   error="Selected delivery location is not available.")
+        location_name = loc_row[1]
+
         # Calculate order items and total
         for category in restaurants[restaurant_id]['menu']:
             for item, price in restaurants[restaurant_id]['menu'][category].items():
@@ -191,20 +256,23 @@ def order(restaurant_id):
                         'subtotal': price * int(quantity)
                     }
                     total += price * int(quantity)
-        
+
         # Save order to database
         if items:
-            conn = sqlite3.connect('data/food_orders.db')
-            c = conn.cursor()
-            
-            c.execute('''INSERT INTO orders (restaurant, name, student_id, phone, items, total)
-                         VALUES (?, ?, ?, ?, ?, ?)''',
-                     (restaurants[restaurant_id]['name'], name, student_id, phone, json.dumps(items), total))
-            
+            # Insert order with location_id
+            c.execute('''INSERT INTO orders (restaurant, name, student_id, phone, items, total, location_id)
+                         VALUES (?, ?, ?, ?, ?, ?, ?)''',
+                      (restaurants[restaurant_id]['name'],
+                       name,
+                       student_id,
+                       phone,
+                       json.dumps(items),
+                       total,
+                       location_id_int))
             order_id = c.lastrowid
             conn.commit()
             conn.close()
-            
+
             # Get the order data for confirmation page
             order_data = {
                 'id': order_id,
@@ -216,11 +284,15 @@ def order(restaurant_id):
                 'order_items': items,
                 'total': total,
                 'status': 'Received',
-                'order_time': datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                'order_time': datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                'location_id': location_id_int,
+                'location_name': location_name
             }
-            
+
             return render_template('order.html', order=order_data)
-    
+
+        # no items selected
+        conn.close()
     return redirect(url_for('home'))
 
 @app.route('/order_status')
@@ -231,13 +303,13 @@ def order_status():
 def api_order_status():
     student_id = request.form.get('student_id')
     phone = request.form.get('phone')
-    
-    conn = sqlite3.connect('data/food_orders.db')
+
+    conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
-    
-    c.execute('''SELECT * FROM orders WHERE student_id = ? AND phone = ? 
+
+    c.execute('''SELECT * FROM orders WHERE student_id = ? AND phone = ?
                  ORDER BY order_time DESC''', (student_id, phone))
-    
+
     orders = []
     for row in c.fetchall():
         try:
@@ -247,7 +319,7 @@ def api_order_status():
                 order_items = {}
         except:
             order_items = {}
-            
+
         orders.append({
             'id': row[0],
             'restaurant': row[1],
@@ -257,13 +329,23 @@ def api_order_status():
             'order_items': order_items,
             'total': row[6],
             'status': row[7],
-            'order_time': row[8]
+            'order_time': row[8],
+            'location_id': row[9] if len(row) > 9 else None
         })
-    
+
     conn.close()
-    
-    return render_template('order_status.html', orders=orders, 
+
+    return render_template('order_status.html', orders=orders,
                           student_id=student_id, phone=phone)
+
+# Helper to fetch active locations
+def get_active_locations():
+    conn = sqlite3.connect(DB_PATH)
+    c = conn.cursor()
+    c.execute("SELECT id, name, short_code, is_active FROM locations WHERE is_active = 1 ORDER BY name")
+    loc_rows = c.fetchall()
+    conn.close()
+    return [{'id': r[0], 'name': r[1], 'short_code': r[2], 'is_active': r[3]} for r in loc_rows]
 
 # Admin routes
 @app.route('/admin')
@@ -274,12 +356,12 @@ def admin_login():
 def admin_dashboard():
     username = request.form.get('username')
     password = request.form.get('password')
-    
+
     if username == ADMIN_USERNAME and password == ADMIN_PASSWORD:
         try:
-            conn = sqlite3.connect('data/food_orders.db')
+            conn = sqlite3.connect(DB_PATH)
             c = conn.cursor()
-            
+
             c.execute('''SELECT * FROM orders ORDER BY order_time DESC''')
             orders = []
             for row in c.fetchall():
@@ -290,7 +372,7 @@ def admin_dashboard():
                         order_items = {}
                 except:
                     order_items = {}
-                    
+
                 orders.append({
                     'id': row[0],
                     'restaurant': row[1],
@@ -300,51 +382,27 @@ def admin_dashboard():
                     'order_items': order_items,
                     'total': row[6],
                     'status': row[7],
-                    'order_time': row[8]
+                    'order_time': row[8],
+                    'location_id': row[9] if len(row) > 9 else None
                 })
-            
+
+            # fetch all locations (for admin panel)
+            c.execute("SELECT id, name, short_code, is_active FROM locations ORDER BY created_at DESC")
+            loc_rows = c.fetchall()
+            locations = [{'id': r[0], 'name': r[1], 'short_code': r[2], 'is_active': r[3]} for r in loc_rows]
+
             conn.close()
-            return render_template('admin_dashboard.html', orders=orders)
+            return render_template('admin_dashboard.html', orders=orders, locations=locations)
         except Exception as e:
             return render_template('admin_login.html', error="Database error occurred")
     else:
         return render_template('admin_login.html', error="Invalid credentials")
 
-@app.route('/admin/update_status', methods=['POST'])
-def update_order_status():
-    order_id = request.form.get('order_id')
-    new_status = request.form.get('status')
-    
-    conn = sqlite3.connect('data/food_orders.db')
-    c = conn.cursor()
-    
-    c.execute('''UPDATE orders SET status = ? WHERE id = ?''', 
-              (new_status, order_id))
-    
-    conn.commit()
-    conn.close()
-    
-    return redirect(url_for('admin_dashboard_redirect'))
-
-@app.route('/admin/delete_order', methods=['POST'])
-def delete_order():
-    order_id = request.form.get('order_id')
-    
-    conn = sqlite3.connect('data/food_orders.db')
-    c = conn.cursor()
-    
-    c.execute('''DELETE FROM orders WHERE id = ?''', (order_id,))
-    
-    conn.commit()
-    conn.close()
-    
-    return redirect(url_for('admin_dashboard_redirect'))
-
 @app.route('/admin/dashboard')
 def admin_dashboard_redirect():
-    conn = sqlite3.connect('data/food_orders.db')
+    conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
-    
+
     c.execute('''SELECT * FROM orders ORDER BY order_time DESC''')
     orders = []
     for row in c.fetchall():
@@ -355,7 +413,7 @@ def admin_dashboard_redirect():
                 order_items = {}
         except:
             order_items = {}
-            
+
         orders.append({
             'id': row[0],
             'restaurant': row[1],
@@ -365,11 +423,87 @@ def admin_dashboard_redirect():
             'order_items': order_items,
             'total': row[6],
             'status': row[7],
-            'order_time': row[8]
+            'order_time': row[8],
+            'location_id': row[9] if len(row) > 9 else None
         })
-    
+
+    # fetch all locations (for admin panel)
+    c.execute("SELECT id, name, short_code, is_active FROM locations ORDER BY created_at DESC")
+    loc_rows = c.fetchall()
+    locations = [{'id': r[0], 'name': r[1], 'short_code': r[2], 'is_active': r[3]} for r in loc_rows]
+
     conn.close()
-    return render_template('admin_dashboard.html', orders=orders)
+    return render_template('admin_dashboard.html', orders=orders, locations=locations)
+
+@app.route('/admin/add_location', methods=['POST'])
+def admin_add_location():
+    name = request.form.get('name', '').strip()
+    short_code = request.form.get('short_code', '').strip() or None
+
+    if not name:
+        return redirect(url_for('admin_dashboard_redirect'))
+
+    conn = sqlite3.connect(DB_PATH)
+    c = conn.cursor()
+    try:
+        c.execute("INSERT INTO locations (name, short_code, is_active) VALUES (?, ?, 1)", (name, short_code))
+        conn.commit()
+    except Exception:
+        # ignore unique constraint or other DB errors silently for now
+        pass
+    finally:
+        conn.close()
+
+    return redirect(url_for('admin_dashboard_redirect'))
+
+@app.route('/admin/location/<int:location_id>/toggle', methods=['POST'])
+def admin_toggle_location(location_id):
+    conn = sqlite3.connect(DB_PATH)
+    c = conn.cursor()
+    # flip is_active: 1 -> 0, 0 -> 1
+    c.execute("UPDATE locations SET is_active = CASE WHEN is_active = 1 THEN 0 ELSE 1 END WHERE id = ?", (location_id,))
+    conn.commit()
+    conn.close()
+    return redirect(url_for('admin_dashboard_redirect'))
+
+@app.route('/admin/location/<int:location_id>/delete', methods=['POST'])
+def admin_delete_location(location_id):
+    conn = sqlite3.connect(DB_PATH)
+    c = conn.cursor()
+    c.execute("DELETE FROM locations WHERE id = ?", (location_id,))
+    conn.commit()
+    conn.close()
+    return redirect(url_for('admin_dashboard_redirect'))
+
+@app.route('/admin/update_status', methods=['POST'])
+def update_order_status():
+    order_id = request.form.get('order_id')
+    new_status = request.form.get('status')
+
+    conn = sqlite3.connect(DB_PATH)
+    c = conn.cursor()
+
+    c.execute('''UPDATE orders SET status = ? WHERE id = ?''',
+              (new_status, order_id))
+
+    conn.commit()
+    conn.close()
+
+    return redirect(url_for('admin_dashboard_redirect'))
+
+@app.route('/admin/delete_order', methods=['POST'])
+def delete_order():
+    order_id = request.form.get('order_id')
+
+    conn = sqlite3.connect(DB_PATH)
+    c = conn.cursor()
+
+    c.execute('''DELETE FROM orders WHERE id = ?''', (order_id,))
+
+    conn.commit()
+    conn.close()
+
+    return redirect(url_for('admin_dashboard_redirect'))
 
 if __name__ == '__main__':
     app.run(debug=True)
